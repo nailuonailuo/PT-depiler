@@ -1,4 +1,4 @@
-import { merge, mergeWith } from "es-toolkit";
+import { mergeWith, toMerged } from "es-toolkit";
 import { set } from "es-toolkit/compat";
 
 import type { IAdvancedSearchRequestConfig, TSelectSearchCategoryValue, ISiteMetadata, IUserInfo } from "../types";
@@ -293,7 +293,7 @@ const category: ISiteMetadata["category"] = [
 ];
 
 const { userInfo: schemaUserInfo = {} } = SchemaMetadata;
-const userInfo: ISiteMetadata["userInfo"] = merge(schemaUserInfo, {
+const userInfo: ISiteMetadata["userInfo"] = toMerged(schemaUserInfo, {
   selectors: {
     // "page": "/userdetails.php?id=$user.id$",
     bonus: {
@@ -353,16 +353,12 @@ export default class QingWa extends NexusPHP {
     if (userSeedingRequestString && userSeedingRequestString?.includes("<table")) {
       const userSeedingDocument = createDocument(userSeedingRequestString);
       seedStatus.seeding = this.getFieldData(userSeedingDocument, {
-        selector: "b:first",
+        selector: "#total_count",
         filters: [{ name: "parseNumber" }],
       });
 
       seedStatus.seedingSize = this.getFieldData(userSeedingDocument, {
-        selector: [
-          "div:has(b):contains('总大小')",
-          "div:has(b):contains('總大小')",
-          "div:has(b):contains('Total size')",
-        ],
+        selector: ["#total_size"],
         filters: [{ name: "parseSize" }],
       });
     }

@@ -34,6 +34,7 @@ import NavButton from "@/options/components/NavButton.vue";
 import CheckSwitchButton from "@/options/components/CheckSwitchButton.vue";
 
 import { type IUserDataStatistic, loadFullData, setSubDate } from "./utils.ts";
+import { NO_IMAGE } from "@ptd/site";
 
 type EChartsLineChartOption = ComposeOption<
   TitleComponentOption | TooltipComponentOption | LegendComponentOption | GridComponentOption | LineSeriesOption
@@ -55,7 +56,7 @@ const perChartHeight = computed(() => 400);
 
 const allowEditName = ref<boolean>(false);
 
-const rawDataRef = ref<IUserDataStatistic>({ siteDateRange: {}, dailyUserInfo: {} });
+const rawDataRef = shallowRef<IUserDataStatistic>({ siteDateRange: {}, dailyUserInfo: {}, incrementalData: {} });
 
 const allDateRanges = computed(() => Object.keys(rawDataRef.value.dailyUserInfo));
 const allSites = computed<string[]>(() => Object.keys(rawDataRef.value.siteDateRange));
@@ -144,26 +145,33 @@ const totalSiteSeedingInfoChartOptions = computed(() => {
   return {
     title: {
       text: `[${configStore.userName}] ${t("UserDataStatistic.chart.totalSiteSeeding")}`,
-      subtext: `做种体积: ${formatSize(seedingSize.at(-1)!)}, 数量: ${(seeding.at(-1) ?? 0).toFixed(2)}`,
+      subtext: `做种量: ${formatSize(seedingSize.at(-1)!)}, 数量: ${(seeding.at(-1) ?? 0).toFixed(2)}`,
       left: "center", // 设置标题居中
     },
     tooltip: {
       trigger: "axis",
       formatter: createTotalInfoTooltipFormatter(["size", "int"]),
     },
-    legend: { data: ["做种体积", "做种数"], bottom: 10, orient: "horizontal" },
+    legend: { data: ["做种量", "做种数"], bottom: 10, orient: "horizontal" },
     grid: { left: "3%", right: "4%", bottom: "10%", containLabel: true },
     xAxis: { type: "category", boundaryGap: false, data: selectedDateRanges.value }, // 时间轴
     yAxis: [
-      { type: "value", name: "做种体积", position: "left", axisLabel: { formatter: formatSize } },
+      { type: "value", name: "做种量", position: "left", axisLabel: { formatter: formatSize } },
       { type: "value", name: "做种数", position: "right", axisLabel: { formatter: (value) => value.toFixed(0) } },
     ],
     series: [
-      { name: "做种体积", type: "line", smooth: true, data: seedingSize, yAxisIndex: 0 },
+      { name: "做种量", type: "line", smooth: true, data: seedingSize, yAxisIndex: 0 },
       { name: "做种数", type: "line", smooth: true, data: seeding, yAxisIndex: 1 },
     ],
   } as EChartsLineChartOption;
 });
+
+// Echart 不支持在 tooltip 中直接获取鼠标悬停的系列索引，所以我们需要通过 mousemove 事件手动记录
+const lastHoveredSeriesIndex = ref<number>(-1);
+
+function updateLastHoveredSeriesIndex(data: any) {
+  lastHoveredSeriesIndex.value = data?.seriesIndex ?? -1; // 获取鼠标悬停的系列索引
+}
 
 const createPerSiteChartOptionsFn = (
   field: keyof IStoredUserInfo,
@@ -174,32 +182,18 @@ const createPerSiteChartOptionsFn = (
     const series = selectedSites.value.map((site) => {
       let data;
       if (incr) {
-        let minSiteDate = new Date(rawDataRef.value.siteDateRange[site]?.[0] ?? selectedDateRanges.value[0]);
-
-        data = selectedDateRanges.value.map((date, idx) => {
-          if (new Date(date) <= minSiteDate) {
-            return 0; // 对站点的第一次有数据的值进行特殊处理
-          }
-
-          let currentData = selectedDataComputed.value[date]?.[site]?.[field];
-          if (typeof currentData === "undefined" || currentData === "") {
-            return 0;
-          }
-          currentData = currentData || 0; // 确保 currentData 有值可以比较
-
-          // 获取前一个有效的数据
-          let previousDataIdx = idx;
-          let previousData;
-          do {
-            previousDataIdx--;
-            previousData = selectedDataComputed.value[selectedDateRanges.value[previousDataIdx]]?.[site]?.[field];
-          } while (previousDataIdx > 0 && (typeof previousData === "undefined" || previousData === ""));
-
-          previousData = previousData || 0; // 确保 previousData 有值可以比较
-          return currentData - previousData;
+        // 使用预计算的增量数据，大幅提升性能
+        data = selectedDateRanges.value.map((date) => {
+          const incrementalValue = rawDataRef.value.incrementalData[site]?.[date]?.[field];
+          // 修正：强制转换为数字，避免 NaN 或字符串
+          return isNumber(incrementalValue) ? incrementalValue : Number(incrementalValue) || 0;
         });
       } else {
-        data = selectedDateRanges.value.map((date) => selectedDataComputed.value[date]?.[site]?.[field] ?? 0);
+        data = selectedDateRanges.value.map((date) => {
+          const val = selectedDataComputed.value[date]?.[site]?.[field];
+          // 修正：强制转换为数字，避免 NaN 或字符串
+          return isNumber(val) ? val : Number(val) || 0;
+        });
       }
 
       return {
@@ -209,17 +203,6 @@ const createPerSiteChartOptionsFn = (
           focus: "series",
         },
         stack: "site",
-        tooltip: {
-          formatter: (params: any) => {
-            const siteName = allAddedSiteMetadata[site]?.siteName ?? site;
-            const siteFavicon = allAddedSiteMetadata[site]?.faviconSrc ?? "";
-
-            return (
-              `<div class="d-inline-flex align-center"><img src="${siteFavicon}" class="mr-1" style="width:16px; height: 16px; " alt="${siteName}">${siteName}</div>` +
-              `<div style='color: ${params.color}'>${params.marker}${params.name}: ${formatDict[format](params.value)}</div>`
-            );
-          },
-        },
         data,
       };
     });
@@ -231,7 +214,64 @@ const createPerSiteChartOptionsFn = (
         text: `[${configStore.userName}] ${t("UserDataStatistic.chart.perSiteK" + field + (incr ? "Incr" : ""))}`,
         left: "center",
       },
-      tooltip: { trigger: "item" },
+      tooltip: {
+        trigger: "axis",
+        axisPointer: {
+          type: "shadow",
+        },
+        formatter: (params: any[]) => {
+          let ret = "";
+          const date = params?.[0]?.name ?? "No Date"; // 从params 中拿到日期
+          ret += `<span class="font-weight-bold">${date}</span><br>`;
+
+          const hasData = params.some((x) => Number(x.data));
+          const totalCount = params.reduce((acc, cur) => acc + (Number(cur.data) || 0), 0); // 算出总和
+          let thresholdSite = 0; // 低于阈值的站点数量
+
+          if (hasData) {
+            ret += '<table style="width: 100%;">';
+            ret += `<tr class="font-weight-bold" style="border-bottom: 1pt solid black;"><td class="pr-3">总和</td><td class="pr-3 text-right">${formatDict[format](totalCount)}</td><td class="text-right">100%</td></tr>`;
+
+            const sortedParams = params.sort((a, b) => b.data - a.data);
+
+            for (const data of sortedParams) {
+              const dataValue = Number(data.data) || 0;
+
+              if (dataValue === 0) continue; // 跳过无数据的站点
+              const site = data.seriesName;
+              const siteName = allAddedSiteMetadata[site]?.siteName ?? site;
+              const siteFavicon = allAddedSiteMetadata[site]?.faviconSrc ?? NO_IMAGE;
+              const precentValue = (dataValue / totalCount) * 100;
+              const isHighlightSite = lastHoveredSeriesIndex.value === data.seriesIndex; // 是否高亮此行
+
+              // 跳过低于阈值且没有高亮的站点
+              if (
+                !isHighlightSite &&
+                Math.abs(precentValue) < (configStore.userStatisticControl.hidePerSitePrecentThreshold ?? 0)
+              ) {
+                thresholdSite++;
+                continue;
+              }
+
+              ret += `<tr style='${isHighlightSite ? `color: ${data.color};` : ""}'>
+<td class="pr-3"><div class="d-inline-flex align-center"><img src="${siteFavicon}" class="mr-1" style="width:16px; height: 16px; " alt="${siteName}">${siteName}</div></td>
+<td class="pr-3 text-right">${formatDict[format](data.value)}</td>
+<td class="text-right">${precentValue.toFixed(2)}%</td>
+</tr>`;
+            }
+
+            if (thresholdSite > 0) {
+              ret += `<tr><td colspan="3" class="text-right">（另有 ${thresholdSite} 个站点数据被隐藏 )</td></tr>`;
+            }
+
+            ret += "</table>";
+          } else {
+            ret += `无数据`;
+          }
+
+          return ret;
+        },
+      },
       legend: {
         data: seriesTotal.sort((a, b) => b.value - a.value).map((x) => x.name),
         bottom: 10,
@@ -240,7 +280,7 @@ const createPerSiteChartOptionsFn = (
         formatter: (site) => allAddedSiteMetadata[site].siteName ?? site,
       },
       grid: { left: "3%", right: "4%", bottom: "10%", containLabel: true },
-      xAxis: { type: "category", boundaryGap: false, data: selectedDateRanges.value }, // 时间轴
+      xAxis: { type: "category", boundaryGap: true, data: selectedDateRanges.value }, // 所有柱状图都使用 boundaryGap: true
       yAxis: [{ type: "value", name: "数据", axisLabel: { formatter: formatDict[format] } }],
       series,
     } as EChartsBarChartOption;
@@ -262,7 +302,7 @@ onMounted(async () => {
   rawDataRef.value = await loadFullData();
 
   // 加载所有站点的元数据
-  await loadAllAddedSiteMetadata();
+  await loadAllAddedSiteMetadata(Object.keys(rawDataRef.value.siteDateRange));
 
   // 从路由中加载默认参数
   const { days = -1, sites = [] } = route.query ?? {};
@@ -281,7 +321,14 @@ onMounted(async () => {
     selectedDateRanges.value = allDateRanges.value;
   }
 
-  selectedSites.value = ((sites as string[]).length > 0 ? sites : allSites.value) as string[];
+  // 勾选站点，优先使用 route 参数，其次是上次保存的配置，最后是全部站点
+  if ((sites as string[]).length > 0) {
+    selectedSites.value = sites as string[];
+  } else if ((configStore.userStatisticControl.selectedSites ?? []).length > 0) {
+    selectedSites.value = configStore.userStatisticControl.selectedSites;
+  } else {
+    selectedSites.value = allSites.value;
+  }
 
   if (configStore.userName === "") {
     configStore.userName = configStore.getUserNames.perfName;
@@ -325,6 +372,7 @@ async function exportStatisticImg() {
 }
 
 function saveControl() {
+  configStore.userStatisticControl.selectedSites = selectedSites.value;
   configStore.$save();
   useRuntimeStore().showSnakebar("保存成功", { color: "success" });
 }
@@ -352,7 +400,7 @@ function saveControl() {
           class="chart"
           group="totalSiteSeeding"
         />
-        <!-- 分站点上传、下载、做种、做种体积、积分、时魔数据 -->
+        <!-- 分站点上传、下载、做种、做种量、积分、时魔值数据 -->
         <template v-for="[field, format] in perSiteChartField" :key="field">
           <v-chart
             v-if="
@@ -364,6 +412,7 @@ function saveControl() {
             :style="{ height: `${perChartHeight}px` }"
             autoresize
             class="chart"
+            @mousemove="updateLastHoveredSeriesIndex"
           />
           <v-chart
             v-if="
@@ -375,22 +424,21 @@ function saveControl() {
             :style="{ height: `${perChartHeight}px` }"
             autoresize
             class="chart"
+            @mousemove="updateLastHoveredSeriesIndex"
           />
         </template>
       </v-col>
       <v-col>
-        <v-alert title="数据图表样式设置" type="info" class="mb-2">
-          <template #append>
-            <NavButton icon="mdi-arrow-left" size="small" color="grey" text="返回" @click="() => router.back()" />
-            <NavButton
-              color="grey"
-              icon="mdi-file-export-outline"
-              size="small"
-              text="导出图片"
-              @click="exportStatisticImg"
-            />
-          </template>
-        </v-alert>
+        <v-row class="flex-nowrap mb-0">
+          <v-col class="d-flex">
+            <NavButton color="grey" icon="mdi-arrow-left" text="返回" @click="() => router.back()" />
+            <v-spacer />
+            <NavButton color="info" icon="mdi-file-export-outline" text="导出图片" @click="exportStatisticImg" />
+            <NavButton color="green" icon="mdi-content-save" text="保存设置" @click="saveControl" />
+          </v-col>
+        </v-row>
+
+        <v-alert title="数据图表样式设置" type="info" class="mb-2"> </v-alert>
 
         <v-row>
           <v-col align-self="center">
@@ -486,23 +534,34 @@ function saveControl() {
           </v-col>
         </v-row>
 
-        <v-divider class="my-2" />
-
-        <v-row class="flex-nowrap">
-          <v-col class="d-flex">
-            <v-spacer />
-            <NavButton icon="mdi-content-save" text="保存样式设置" color="green" @click="saveControl" />
+        <v-row>
+          <v-col align-self="center">
+            <v-label>图表设置</v-label>
+          </v-col>
+          <v-col cols="12" sm="10">
+            <v-number-input
+              v-model="configStore.userStatisticControl.hidePerSitePrecentThreshold"
+              :max="100"
+              :min="0"
+              :precision="2"
+              :step="1"
+              controlVariant="default"
+              hint="设置为0则不隐藏"
+              label="隐藏分站点图中图例百分比低于该值的详情"
+              persistent-hint
+              suffix="%"
+            ></v-number-input>
           </v-col>
         </v-row>
 
-        <v-alert type="info" title="展示站点设置" class="mt-4 mb-2">
+        <v-alert class="mt-4 mb-2" title="展示站点设置" type="info">
           <template #append>
             <CheckSwitchButton v-model="selectedSites" :all="allSites" color="grey" />
           </template>
         </v-alert>
 
         <v-row class="my-2">
-          <v-col v-for="siteId in allSites" :key="siteId" cols="6" sm="3" class="py-0">
+          <v-col v-for="siteId in allSites" :key="siteId" class="py-0" cols="6" sm="3">
             <v-checkbox
               v-model="selectedSites"
               :disabled="!availableSites.includes(siteId)"

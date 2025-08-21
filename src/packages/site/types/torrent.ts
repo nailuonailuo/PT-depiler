@@ -12,6 +12,7 @@ export enum ETorrentStatus {
 
 // 比较基础的种子 Tag
 export type TBaseTorrentTagName =
+  | "NL." // 中性种子（0xUP & 0xDL） "deep-purple"
   | "Free" // 免费下载 "blue",
   | "2xFree" // 免费下载 + 2x 上传 "green",
   | "2xUp" // 2x 上传   "lime",
@@ -23,6 +24,7 @@ export type TBaseTorrentTagName =
   | "70%" // 70% 下载 "blue-grey",
   | "75%" // 75% 下载 "lime-darken-3",
   | "VIP" // 仅 VIP 可下载 "orange-darken-2",
+  | "H&R" // 需要 H&R "red",
   | "Excl." // 禁止转载 "deep-orange-darken-1",
   | string;
 

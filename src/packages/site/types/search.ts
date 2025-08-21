@@ -43,6 +43,11 @@ export interface IBaseSearchConfig {
   requestConfig?: Partial<AxiosRequestConfig>;
 
   /**
+   * 是否在搜索发送请求前延迟一段时间，单位为毫秒
+   */
+  requestDelay?: number;
+
+  /**
    * 定义在正式开始请求前，对合并后的 AxiosRequestConfig 如何处理
    * 一般情况下，此项用于调试，如： (config) => {console.log(config); return config;}
    *
@@ -50,6 +55,24 @@ export interface IBaseSearchConfig {
    * @param filter 原始搜索条件，注意此处的 keywords 已经被去除了前缀 `${advanceKeywordType}|`
    */
   requestConfigTransformer?: TSearchRequestConfigTransformer;
+
+  /**
+   * 字符集支持配置
+   *
+   * 如果设置为 true，当搜索查询包含非拉丁字符（如中文、日文、阿拉伯文、西里尔文等）时，
+   * 该站点将被跳过，不会发送搜索请求。这有助于提高搜索效率，避免向不支持非拉丁字符的站点发送无效请求。
+   *
+   * 如果设置为 false 或未设置（默认），该站点将支持所有字符集的搜索，
+   * 无论搜索查询包含拉丁字符还是非拉丁字符。
+   *
+   * 注意：
+   * - 混合字符查询（同时包含拉丁和非拉丁字符）会被视为非拉丁搜索
+   * - 数字、标点符号和空格被视为字符集中性，不影响字符集检测
+   * - 此配置仅影响搜索请求的发送，不影响站点的其他功能
+   *
+   * @default false - 支持所有字符集
+   */
+  skipNonLatinCharacters?: boolean;
 }
 
 export interface IAdvanceKeywordSearchConfig extends IBaseSearchConfig {
@@ -169,15 +192,16 @@ export interface ISearchCategories {
 
   /**
    *  搜索大类
-   *  注意，在单个站点中搜索大类的 key 不能重复！！！
-   *
-   *  对于一些特殊的情况，如不同搜索入口，可能会出现相同的 key，你可以这样处理：
-   *  1. 将key 设置为 key_xxxx, key_yyyy
-   *  2. 如果这个搜索类别是交叉的，则建议使用 cross.key 覆盖原有的 key
-   *  3. 也可以使用 generateRequestConfig 方法覆盖原有的 key
-   *
+   *  注意：
+   *   1. 在单个站点中搜索大类的 key 不能重复！！！
+   *      对于一些特殊的情况，如不同搜索入口，可能会出现相同的 key，你可以这样处理：
+   *        1. 将key 设置为 key_xxxx, key_yyyy
+   *        2. 如果这个搜索类别是交叉的，则建议使用 cross.key 覆盖原有的 key
+   *        3. 也可以使用 generateRequestConfig 方法覆盖原有的 key
+   *   2. 我们约定了如下的特殊key：
+   *      - #url: 表示直接替换 requestsConfig.url 的值，此时会忽略 keyPath 和 cross 的设置
    */
-  key: string;
+  key: "#url" | string;
   keyPath?: "data" | "params" | string; // 在未设置 generateRequestConfig，用于指导怎么生成请求参数，未指定时默认为 params
 
   options: ISearchCategoryOptions[];

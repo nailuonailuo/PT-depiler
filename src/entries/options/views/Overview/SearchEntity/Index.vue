@@ -2,6 +2,7 @@
 import { computed, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { useDisplay } from "vuetify";
 import { EResultParseStatus, ETorrentStatus } from "@ptd/site";
 import type { DataTableHeader } from "vuetify/lib/components/VDataTable/types";
 
@@ -20,41 +21,50 @@ import SearchStatusDialog from "./SearchStatusDialog.vue";
 import SaveSnapshotDialog from "./SaveSnapshotDialog.vue";
 import AdvanceFilterGenerateDialog from "./AdvanceFilterGenerateDialog.vue";
 
-import { doSearch, searchQueue, tableCustomFilter } from "./utils.ts"; // <-- 主要方法在这个文件中！！！
+import { doSearch, retrySearch, searchPlanStatus, searchQueue, tableCustomFilter } from "./utils.ts"; // <-- 主要方法在这个文件中！！！
 
 const { t } = useI18n();
 const route = useRoute();
 const configStore = useConfigStore();
 const metadataStore = useMetadataStore();
 const runtimeStore = useRuntimeStore();
+const display = useDisplay();
 
 const showAdvanceFilterGenerateDialog = ref<boolean>(false);
 const showSearchStatusDialog = ref<boolean>(false);
 const showSaveSnapshotDialog = ref<boolean>(false);
 
-const fullTableHeader = [
-  { title: "站点", key: "site", align: "center", width: 90, props: { disabled: true } },
-  { title: "标题", key: "title", align: "start", minWidth: 600, maxWidth: "32vw", props: { disabled: true } },
-  { title: "分类", key: "category", align: "center", width: 90 },
-  { title: "大小", key: "size", align: "end" },
-  { title: "上传", key: "seeders", align: "end", width: 90, minWidth: 90 },
-  { title: "下载", key: "leechers", align: "end", width: 90, minWidth: 90 },
-  { title: "完成", key: "completed", align: "end", width: 90, minWidth: 90 },
-  { title: "评论", key: "comments", align: "end", width: 90, minWidth: 90 },
-  { title: "发布于(≈)", key: "time", align: "center" },
-  {
-    title: "操作",
-    key: "action",
-    align: "center",
-    width: 125,
-    minWidth: 125,
-    sortable: false,
-    props: { disabled: true },
-  },
-] as (DataTableHeader & { props?: any })[];
+const fullTableHeader = computed(
+  () =>
+    [
+      { title: t("SearchEntity.index.table.site"), key: "site", align: "center", props: { disabled: true } },
+      {
+        title: t("SearchEntity.index.table.title"),
+        key: "title",
+        align: "start",
+        width: "50%",
+        ...(display.smAndDown.value ? { minWidth: 600, maxWidth: "32vw" } : {}),
+        props: { disabled: true },
+      },
+      { title: t("SearchEntity.index.table.category"), key: "category", align: "center" },
+      { title: t("SearchEntity.index.table.size"), key: "size", align: "end" },
+      { title: t("SearchEntity.index.table.seeders"), key: "seeders", align: "end" },
+      { title: t("SearchEntity.index.table.leechers"), key: "leechers", align: "end" },
+      { title: t("SearchEntity.index.table.completed"), key: "completed", align: "end" },
+      { title: t("SearchEntity.index.table.comments"), key: "comments", align: "end" },
+      { title: t("SearchEntity.index.table.time"), key: "time", align: "center" },
+      {
+        title: t("common.action"),
+        key: "action",
+        align: "center",
+        sortable: false,
+        props: { disabled: true },
+      },
+    ] as (DataTableHeader & { props?: any })[],
+);
 
 const tableHeader = computed(() => {
-  return fullTableHeader.filter(
+  return fullTableHeader.value.filter(
     (item) => item?.props?.disabled || configStore.tableBehavior.SearchEntity.columns!.includes(item.key!),
   ) as DataTableHeader[];
 });
@@ -116,23 +126,50 @@ function cancelSearchQueue() {
 <template>
   <v-alert type="info">
     <v-alert-title>
-      <template v-if="runtimeStore.search.startAt === 0">请输入搜索关键词开始搜索</template>
+      <template v-if="runtimeStore.search.startAt === 0">
+        {{ t("SearchEntity.index.alert.enterKeyword") }}
+      </template>
       <template v-else>
-        <v-btn class="mr-2" color="primary" size="small" @click="showSearchStatusDialog = true">搜索情况</v-btn>
+        <v-btn class="mr-2" color="primary" size="small" @click="showSearchStatusDialog = true">
+          {{ t("SearchEntity.index.alert.statusButton") }}
+        </v-btn>
         <template v-if="runtimeStore.search.isSearching">
-          <template v-if="isSearchingParsed">搜索暂停中...</template>
-          <template v-else>搜索中...</template>
+          <template v-if="isSearchingParsed">
+            {{ t("SearchEntity.index.alert.paused") }}
+          </template>
+          <template v-else>
+            {{ t("SearchEntity.index.alert.searching") }}
+          </template>
         </template>
         <template v-else>
           <template v-if="runtimeStore.search.snapshot">
-            搜索快照 [{{ metadataStore.snapshots[runtimeStore.search.snapshot].name }}] ，
+            {{ t("SearchEntity.index.alert.snapshot") }}
+            [{{ metadataStore.snapshots[runtimeStore.search.snapshot].name }}]，
           </template>
           <template v-else>
-            搜索方案 [{{ metadataStore.getSearchSolutionName(runtimeStore.search.searchPlanKey) }}] ，
+            {{ t("SearchEntity.index.alert.plan") }}
+            [{{ metadataStore.getSearchSolutionName(runtimeStore.search.searchPlanKey) }}]，
           </template>
-          关键词 [{{ runtimeStore.search.searchKey }}]， 共 {{ runtimeStore.search.searchResult.length }} 条结果，
-          耗时： {{ runtimeStore.searchCostTime / 1000 }} 秒。
+          {{ t("SearchEntity.index.alert.keyword") }}
+          [{{ runtimeStore.search.searchKey }}]，
+          {{ t("SearchEntity.index.alert.results", [runtimeStore.search.searchResult.length]) }}
+          {{ t("SearchEntity.index.alert.duration", [(runtimeStore.searchCostTime / 1000).toFixed(1)]) }}
         </template>
+
+        <v-spacer />
+        <v-divider vertical class="mx-2" />
+
+        <div id="ptd-search-entity-status">
+          <template v-if="searchPlanStatus.success > 0">
+            <v-icon size="x-small" class="mr-1" icon="mdi-check" />{{ searchPlanStatus.success }}
+          </template>
+          <template v-if="searchPlanStatus.error > 0">
+            <v-icon class="mr-1" color="amber" icon="mdi-alert" size="x-small" />{{ searchPlanStatus.error }}
+          </template>
+          <template v-if="searchPlanStatus.queued > 0">
+            <v-icon size="x-small" color="blue-grey" class="mr-1" icon="mdi-clock" />{{ searchPlanStatus.queued }}
+          </template>
+        </div>
       </template>
     </v-alert-title>
   </v-alert>
@@ -140,40 +177,54 @@ function cancelSearchQueue() {
     <v-card-title>
       <v-row class="ma-0">
         <v-btn-group size="small" variant="text">
+          <!-- 启动/暂停 搜索队列 -->
           <v-btn
             v-show="isSearchingParsed"
+            :title="t('SearchEntity.index.action.start')"
             color="success"
             icon="mdi-play"
-            title="开始搜索队列"
             @click="() => startSearchQueue()"
-          ></v-btn>
+          />
           <v-btn
             v-show="!isSearchingParsed"
+            :title="t('SearchEntity.index.action.pause')"
             color="success"
             icon="mdi-pause"
-            title="暂停搜索队列"
             @click="() => pauseSearchQueue()"
-          ></v-btn>
+          />
 
+          <!-- 取消/重试 搜索队列 -->
           <v-btn
             v-show="runtimeStore.search.isSearching"
+            :title="t('SearchEntity.index.action.cancel')"
             color="red"
             icon="mdi-cancel"
-            title="取消当前等待的搜索"
             @click="cancelSearchQueue"
-          ></v-btn>
+          />
           <v-btn
             v-show="!runtimeStore.search.isSearching"
             :disabled="isSearchingParsed"
+            :title="t('SearchEntity.index.action.retry')"
             color="red"
-            icon="mdi-cached"
-            title="重新搜索"
+            icon="mdi-sync"
             @click="() => doSearch(null as unknown as string, null as unknown as string, true)"
-          ></v-btn>
+          />
+
+          <!-- 重试失败的搜索 -->
+          <v-btn
+            :disabled="searchPlanStatus.error === 0"
+            :title="t('SearchEntity.index.action.retryFailed')"
+            color="amber"
+            icon="mdi-sync-alert"
+            @click="() => retrySearch()"
+          />
+
+          <v-divider vertical class="mx-2" />
 
           <!-- 创建搜索快照 -->
           <v-btn
             :disabled="runtimeStore.search.isSearching || runtimeStore.search.searchResult.length === 0"
+            :title="t('SearchEntity.index.action.saveSnapshot')"
             color="cyan"
             icon="mdi-camera-plus"
             @click="showSaveSnapshotDialog = true"
@@ -243,7 +294,7 @@ function cancelSearchQueue() {
           clearable
           density="compact"
           hide-details
-          label="过滤搜索结果"
+          :label="t('SearchEntity.index.filterLabel')"
           max-width="500"
           prepend-inner-icon="mdi-filter"
           single-line
@@ -264,7 +315,7 @@ function cancelSearchQueue() {
       class="search-entity-table table-stripe table-header-no-wrap"
       hover
       item-value="uniqueId"
-      multi-sort
+      :multi-sort="configStore.enableTableMultiSort"
       show-select
       @update:itemsPerPage="(v) => configStore.updateTableBehavior('SearchEntity', 'itemsPerPage', v)"
       @update:sortBy="(v) => configStore.updateTableBehavior('SearchEntity', 'sortBy', v)"
@@ -350,6 +401,12 @@ function cancelSearchQueue() {
 #ptd-search-entity-table {
   :deep(td.v-data-table__td) {
     padding: 0 8px;
+  }
+}
+
+#ptd-search-entity-status {
+  i.v-icon + i.v-icon {
+    margin-left: 4px;
   }
 }
 </style>

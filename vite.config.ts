@@ -34,6 +34,11 @@ const permissions = [
   "unlimitedStorage",
 ];
 
+// @ts-ignore
+const git_count = git.count("HEAD");
+const base_version = `${pkg.version}.${git_count}`;
+const commit_version = `${base_version}+${git.short(__dirname)}`;
+
 // https://vitejs.dev/config/
 export default defineConfig({
   build: {
@@ -63,7 +68,8 @@ export default defineConfig({
         manifest_version: 3,
         "{{chrome}}.minimum_chrome_version": "120",
 
-        version: `${pkg.version}.${git.count()}`,
+        version: base_version,
+        "{{chrome}}.version_name": commit_version,
 
         name: "__MSG_extName__",
         description: "__MSG_extDesc__",
@@ -155,15 +161,39 @@ export default defineConfig({
                   // 特殊情况下 facadeModuleId 可能为 null，这时我们使用 moduleIds 的最后一个作为 chunkName
                   const chunkName = chunkInfo.facadeModuleId || chunkInfo.moduleIds.slice(-1)[0];
 
-                  if (/[\\/]src[\\/]packages[\\/](downloader|backupServer|site|social).+\.ts/.test(chunkName)) {
+                  // 对 src/entries 下的 Index.vue 文件进行特殊处理（以防止构造产物无法区分）
+                  if (/src[\\/]entries[\\/].+?Index\.vue$/.test(chunkName)) {
+                    const indexEntryName = chunkName.match(/.+[\\/](.+?)[\\/]Index\.vue/)?.[1];
+                    return `assets/${indexEntryName}-[hash].js`;
+                  }
+
+                  // 我们自己的 @pkg 下分包，使用 vendor/packages 前缀
+                  if (
+                    /[\\/]src[\\/]packages[\\/](downloader|backupServer|site|social|mediaServer).+\.ts/.test(chunkName)
+                  ) {
                     const name = chunkName.replace(/^.+?[\\/]src[\\/]/, "").replace(/\..+?$/, "");
-                    return `${name}-[hash].js`;
+                    return `vendor/${name}-[hash].js`;
+                  }
+
+                  // 其他 node_modules 分包，直接使用 vendor/{deps} 前缀
+                  if (/node_modules[\\/].+?[\\/]/.test(chunkName)) {
+                    const pkgName = chunkName.match(/.+[\\/]node_modules[\\/](.*?)([\\/]|$)/)?.[1];
+                    return `vendor/${pkgName}/[name]-[hash].js`;
                   }
 
                   return "assets/[name]-[hash].js"; // vite default
                 },
                 entryFileNames: "assets/[name]-[hash].js", // vite default
-                assetFileNames: "assets/[name]-[hash][extname]", // vite default
+                assetFileNames: (assetInfo) => {
+                  const assetName = assetInfo.names[0] || "";
+
+                  // 将 css 文件放到 assets/css 目录下
+                  if (assetName.endsWith(".css")) {
+                    return "assets/css/[name]-[hash][extname]";
+                  }
+
+                  return "assets/[name]-[hash][extname]"; // vite default
+                },
               };
 
               return config;
@@ -182,12 +212,12 @@ export default defineConfig({
   },
   define: {
     __BROWSER__: JSON.stringify(target),
-    __EXT_VERSION__: JSON.stringify(`v${pkg.version}.${git.count()}+${git.short(__dirname)}`),
+    __EXT_VERSION__: JSON.stringify(`v${commit_version}`),
     __GIT_VERSION__: {
       short: git.short(__dirname),
       long: git.long(__dirname),
       date: +git.date(),
-      count: git.count(),
+      count: git_count,
       branch: git.branch(__dirname),
     },
     __BUILD_TIME__: +Date.now(),

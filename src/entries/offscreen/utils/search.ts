@@ -8,6 +8,7 @@ import { getSiteInstance } from "./site.ts";
 import { type TBaseTorrentTagName } from "@ptd/site";
 
 const torrentTagColorMap: Record<TBaseTorrentTagName, string> = {
+  "NL.": "deep-purple",
   Free: "blue",
   "2xFree": "green",
   "2xUp": "lime",
@@ -19,6 +20,7 @@ const torrentTagColorMap: Record<TBaseTorrentTagName, string> = {
   "70%": "blue-grey",
   "75%": "lime-darken-3",
   VIP: "orange-darken-2",
+  "H&R": "red",
   "Excl.": "deep-orange-darken-1",
 };
 

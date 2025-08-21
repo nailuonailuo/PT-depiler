@@ -12,6 +12,7 @@ export const siteMetadata: ISiteMetadata = {
   version: 1,
   id: "keepfrds",
   name: "PT@KEEPFRDS",
+  aka: ["FRDS", "朋友"],
   description: "KEEP FRIENDS 专注于小而美的分享，给大家带来更多更优的视听体验。 Let us keep friends forever!",
   tags: ["影视", "综合"],
 
@@ -207,7 +208,51 @@ export const siteMetadata: ISiteMetadata = {
         ],
         filters: [{ name: "parseSize" }],
       },
+      bonusPerHour: {
+        selector: ["tbody:has(>tr>td.embedded>i.fab.fa-btc)"],
+        filters: [
+          (query: string | number) => {
+            const queryMatch = String(query || "")
+              .replace(/,/g, "")
+              .match(/[\d.]+/g);
+            if (!queryMatch) return 0;
+            let bonusPerHour = 0;
+            if (queryMatch.length === 5) {
+              bonusPerHour = parseFloat(queryMatch[2]) + parseFloat(queryMatch[4]);
+            } else if (queryMatch.length >= 3) {
+              bonusPerHour = parseFloat(queryMatch[2]);
+            }
+            return bonusPerHour;
+          },
+        ],
+      },
     },
+    process: [
+      {
+        requestConfig: { url: "/index.php", responseType: "document" },
+        fields: ["id", "name"],
+      },
+      {
+        requestConfig: { url: "/userdetails.php", responseType: "document" },
+        assertion: { id: "params.id" },
+        fields: [
+          "messageCount",
+          "uploaded",
+          "trueUploaded",
+          "downloaded",
+          "trueDownloaded",
+          "levelName",
+          "bonus",
+          "seedingBonus",
+          "joinTime",
+          "seeding",
+          "seedingSize",
+          "hnrUnsatisfied",
+          "hnrPreWarning",
+          "bonusPerHour", // 使用我们自定义的 selector 和 filter
+        ],
+      },
+    ],
   },
 
   levelRequirements: [

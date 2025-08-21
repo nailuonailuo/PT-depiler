@@ -39,7 +39,7 @@ async function checkConnect() {
     <v-form v-if="clientConfig" v-model="formValid" fast-fail>
       <v-container class="pa-0">
         <v-row>
-          <v-col cols="12" md="4">
+          <v-col cols="12" md="2">
             <v-text-field v-model="clientConfig.type" :label="t('SetDownloader.common.type')" disabled />
           </v-col>
           <v-col cols="12" md="4">
@@ -56,6 +56,15 @@ async function checkConnect() {
               v-model="clientConfig.id"
               :label="t('SetDownloader.common.uid') + t('SetDownloader.editor.uidPlaceholder')"
               disabled
+            />
+          </v-col>
+          <v-col cols="12" md="2">
+            <v-text-field
+              v-model="clientConfig.sortIndex"
+              :label="t('common.sortIndex')"
+              :rules="[formValidateRules.require()]"
+              hide-details
+              type="number"
             />
           </v-col>
         </v-row>
@@ -93,6 +102,7 @@ async function checkConnect() {
             :min="0"
             :step="1e3"
             class="px-2"
+            hide-details
           >
             <template #append>
               <v-btn variant="flat" @click="clientConfig.timeout = 60e3">
@@ -108,7 +118,28 @@ async function checkConnect() {
             :label="t('SetDownloader.editor.autoStart')"
             class="ml-4"
             color="success"
+            hide-details
           />
+        </v-row>
+
+        <v-row v-if="clientMeta.advanceAddTorrentOptions">
+          <v-col>
+            <v-expansion-panels>
+              <v-expansion-panel title="高级设置">
+                <v-expansion-panel-text>
+                  <v-switch
+                    v-for="opt in clientMeta.advanceAddTorrentOptions"
+                    :key="opt.key"
+                    v-model="clientConfig.advanceAddTorrentOptions![opt.key]"
+                    color="success"
+                    :label="opt.name"
+                    :messages="opt.description"
+                    :hide-details="!opt.description"
+                  />
+                </v-expansion-panel-text>
+              </v-expansion-panel>
+            </v-expansion-panels>
+          </v-col>
         </v-row>
       </v-container>
 

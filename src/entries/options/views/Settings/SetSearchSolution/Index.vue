@@ -28,7 +28,7 @@ const solutionId = ref<TSolutionKey>("");
 
 const tableSelected = ref<TSolutionKey[]>([]);
 const tableHeader = [
-  { title: t("common.sortIndex"), key: "sort", align: "center", width: 150 },
+  { title: "№", key: "sort", align: "center", width: 150 },
   { title: t("common.name"), key: "name", align: "start", width: 150 },
   { title: t("SetSearchSolution.solution"), key: "solution", align: "start", minWidth: 400, sortable: false },
   { title: t("SetSearchSolution.table.enable"), key: "enabled", align: "center", width: 120 },
@@ -157,12 +157,17 @@ function setDefaultSearchSolution(toDefault: boolean, solutionId: TSolutionKey) 
           @change="importSearchSolution"
         />
 
-        <NavButton color="info" icon="mdi-import" text="导入" @click="() => importFileInputRef?.click()" />
+        <NavButton
+          color="info"
+          icon="mdi-import"
+          :text="t('SetSearchSolution.import')"
+          @click="() => importFileInputRef?.click()"
+        />
         <NavButton
           :disabled="tableSelected.length === 0"
           color="info"
           icon="mdi-export"
-          text="导出"
+          :text="t('SetSearchSolution.export')"
           @click="() => exportSearchSolutions(tableSelected)"
         />
 
@@ -178,7 +183,7 @@ function setDefaultSearchSolution(toDefault: boolean, solutionId: TSolutionKey) 
           clearable
           density="compact"
           hide-details
-          label="Search"
+          :label="t('common.search')"
           max-width="500"
           single-line
         />
@@ -200,7 +205,7 @@ function setDefaultSearchSolution(toDefault: boolean, solutionId: TSolutionKey) 
       class="table-stripe table-header-no-wrap"
       hover
       item-value="id"
-      multi-sort
+      :multi-sort="configStore.enableTableMultiSort"
       show-select
       @update:itemsPerPage="(v) => configStore.updateTableBehavior('SetSearchSolution', 'itemsPerPage', v)"
     >

@@ -8,6 +8,7 @@ export const siteMetadata: ISiteMetadata = {
   version: 1,
   id: "hdkylin",
   name: "HDKylin",
+  aka: ["麒麟"],
   description: "与志同道合之人前行 分享更多值得珍藏的资源",
   tags: ["综合", "电影", "电视剧", "纪录片"],
   type: "private",
@@ -52,7 +53,7 @@ export const siteMetadata: ISiteMetadata = {
     {
       id: 5,
       groupType: "user",
-      name: "Crazy User(轻舟飘渺)	",
+      name: "Crazy User(轻舟飘渺)",
       seedingBonus: 150000,
       ratio: 4.0,
       interval: "P15W",
@@ -72,7 +73,7 @@ export const siteMetadata: ISiteMetadata = {
     {
       id: 7,
       groupType: "user",
-      name: "Veteran User(江东帆影)	",
+      name: "Veteran User(江东帆影)",
       seedingBonus: 400000,
       ratio: 6.0,
       interval: "P40W",
@@ -92,7 +93,7 @@ export const siteMetadata: ISiteMetadata = {
     {
       id: 9,
       groupType: "user",
-      name: "Ultimate User(九州雷动)	",
+      name: "Ultimate User(九州雷动)",
       seedingBonus: 800000,
       ratio: 8.0,
       interval: "P80W",
@@ -102,7 +103,7 @@ export const siteMetadata: ISiteMetadata = {
     {
       id: 10,
       groupType: "user",
-      name: "Nexus Master(一鳞半爪)	",
+      name: "Nexus Master(一鳞半爪)",
       seedingBonus: 1000000,
       ratio: 10.0,
       interval: "P100W",
@@ -137,13 +138,13 @@ export const siteMetadata: ISiteMetadata = {
       id: 203,
       groupType: "manager",
       name: "管理员(Administrator)",
-      privilege: `	除了不能改变站点设定、管理捐赠外，可以做任何事。`,
+      privilege: `除了不能改变站点设定、管理捐赠外，可以做任何事。`,
     },
     {
       id: 204,
       groupType: "manager",
       name: "维护开发员(Sysop)",
-      privilege: `	网站开发/维护人员，可以改变站点设定，不能管理捐赠。`,
+      privilege: `网站开发/维护人员，可以改变站点设定，不能管理捐赠。`,
     },
     {
       id: 205,

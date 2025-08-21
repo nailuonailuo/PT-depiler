@@ -6,7 +6,9 @@ import { EJobType } from "@/background/utils/alarms.ts";
 import { useConfigStore } from "@/options/stores/config.ts";
 import { useMetadataStore } from "@/options/stores/metadata.ts";
 import { formatDate } from "@/options/utils.ts";
+import { useI18n } from "vue-i18n";
 
+const { t } = useI18n();
 const configStore = useConfigStore();
 const metadataStore = useMetadataStore();
 
@@ -40,25 +42,25 @@ onMounted(async () => {
 
 <template>
   <v-row>
-    <v-col md="6">
+    <v-col md="10" lg="8">
       <v-number-input
         v-model="configStore.userInfo.queueConcurrency"
-        :max="100"
+        :max="25"
         :min="1"
-        label="请求队列长度"
+        :label="t('userInfo.queueConcurrency')"
       ></v-number-input>
 
       <!-- 自动刷新 -->
       <v-switch
         v-model="configStore.userInfo.autoReflush.enabled"
-        :label="`是否启用后台定时刷新？`"
+        :label="t('userInfo.enableAutoRefresh')"
         color="success"
         hide-details
       />
       <v-row v-if="configStore.userInfo.autoReflush.enabled" class="mt-1 ml-2 mb-2">
         <v-alert type="info" variant="outlined">
           <div class="d-inline-flex align-center text-no-wrap">
-            每隔
+            {{ t("userInfo.autoRefresh.every") }}
             <v-select
               v-model="configStore.userInfo.autoReflush.interval"
               :items="range(1, 24)"
@@ -68,12 +70,12 @@ onMounted(async () => {
               density="compact"
               hide-details
             />
-            小时，自动刷新一次当天
-            <p class="font-weight-bold">未刷新过</p>
-            的站点
+            {{ t("userInfo.autoRefresh.hoursLabel") }}
+            <p class="font-weight-bold">{{ t("userInfo.autoRefresh.unrefreshedSite") }}</p>
+            {{ t("userInfo.autoRefresh.ofSites") }}
           </div>
           <div class="d-inline-flex align-center text-no-wrap">
-            如果刷新失败，则重试
+            {{ t("userInfo.autoRefresh.retryOnFail") }}
             <v-select
               v-model="configStore.userInfo.autoReflush.retry.max"
               :items="range(0, 6)"
@@ -81,7 +83,7 @@ onMounted(async () => {
               density="compact"
               hide-details
             />
-            次，每次间隔
+            {{ t("userInfo.autoRefresh.times") }}
             <v-select
               v-model="configStore.userInfo.autoReflush.retry.interval"
               :items="range(1, 11)"
@@ -89,10 +91,11 @@ onMounted(async () => {
               density="compact"
               hide-details
             />
-            分钟。
+            {{ t("userInfo.autoRefresh.minutes") }}
           </div>
           <div class="d-flex align-center justify-end mt-1">
-            最近一次刷新时间: {{ formatDate(metadataStore.lastUserInfoAutoFlushAt) }} &nbsp; 下一次刷新时间:
+            {{ t("userInfo.autoRefresh.lastFlushTime") }} {{ formatDate(metadataStore.lastUserInfoAutoFlushAt) }} &nbsp;
+            {{ t("userInfo.autoRefresh.nextFlushTime") }}
             {{ nextFlushUserInfoAt != 0 ? formatDate(nextFlushUserInfoAt) : "-" }}
             <v-btn
               class="ml-1"
@@ -106,15 +109,53 @@ onMounted(async () => {
         </v-alert>
       </v-row>
 
+      <!-- 自动延长cookies -->
+      <v-switch
+        v-model="configStore.autoExtendCookies.enabled"
+        :label="t('userInfo.autoExtendCookies.enabled')"
+        color="success"
+        hide-details
+      />
+      <v-row v-if="configStore.autoExtendCookies.enabled" class="mt-1 ml-2 mb-2">
+        <v-alert type="info" variant="outlined">
+          <div class="d-inline-flex align-center text-no-wrap mb-2">
+            {{ t("userInfo.autoExtendCookies.triggerThreshold") }}:
+            <v-select
+              v-model="configStore.autoExtendCookies.triggerThreshold"
+              :items="range(1, 4)"
+              :max="3"
+              :min="1"
+              class="mx-2"
+              density="compact"
+              hide-details
+            />
+            {{ t("userInfo.autoExtendCookies.weeks") }}
+          </div>
+          <div class="d-inline-flex align-center text-no-wrap mb-2">
+            {{ t("userInfo.autoExtendCookies.extensionDuration") }}:
+            <v-select
+              v-model="configStore.autoExtendCookies.extensionDuration"
+              :items="range(1, 13)"
+              :max="12"
+              :min="1"
+              class="mx-2"
+              density="compact"
+              hide-details
+            />
+            {{ t("userInfo.autoExtendCookies.months") }}
+          </div>
+        </v-alert>
+      </v-row>
+
       <v-switch
         v-model="configStore.userInfo.showDeadSiteInOverview"
-        :label="`在概览中展示已被标记为死亡 （isDead） 的站点`"
+        :label="t('userInfo.showDeadSite')"
         color="success"
         hide-details
       />
       <v-switch
         v-model="configStore.userInfo.showPassedSiteInOverview"
-        :label="`在概览中展示已被标记为离线 （isOffline） 或不允许查询用户信息的站点`"
+        :label="t('userInfo.showPassedSite')"
         color="success"
         hide-details
       />

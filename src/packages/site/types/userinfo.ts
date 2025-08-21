@@ -31,8 +31,8 @@ export interface IImplicitUserInfo {
   ratio?: number | [number, number]; // 分享率需求
   trueRatio?: number | [number, number]; // 真实分享率需求
 
-  seeding?: number; // 做种数量需求
-  seedingSize?: number | TSize; // 做种体积需求
+  seeding?: number; // 做种数需求
+  seedingSize?: number | TSize; // 做种量需求
   seedingTime?: number | isoDuration; // 做种时间（秒）需求，如果是 string 则类似 isoDuration，可以定义 30天 为 "30D"
   averageSeedingTime?: number | isoDuration; // 平均做种时间（秒）需求
 
@@ -48,7 +48,7 @@ export interface IImplicitUserInfo {
   // bonusNeededInterval?: `${number}H`;
   // seedingBonusNeededInterval?: `${number}H`;
 
-  uploads?: number; // 发布种子数需求
+  uploads?: number; // 发布数需求
   leeching?: number; // 下载数量需求
   snatches?: number; // 完成种子数需求
   posts?: number; // 发布帖子数需求
@@ -64,6 +64,7 @@ export const MinNonUserLevelId = 100; // 最大等级ID
 export interface ILevelRequirement extends IImplicitUserInfo {
   id: TLevelId; // 等级序列，应该是一个递增的序列，不可重复，应当小于 MaxUserLevelId - 1
   name: TLevelName; // 需要与 IUserInfo中对应的 levelName 相同
+  nameAka?: TLevelName[]; // 该等级的别名，通常用在i18n环境中，name 和 nameAka[*] 的值会同步用来 判断 LevelId
   groupType?: TLevelGroupType; // 等级组别，不指定的话，默认为 user
   privilege?: string; // 获得的特权说明
 
@@ -93,7 +94,7 @@ export interface IUserInfo extends Omit<IImplicitUserInfo, "interval"> {
   trueUploaded?: number; // 真实上传量
   ratio?: number; // 分享率
   trueRatio?: number; // 真实分享率
-  seedingSize?: number; // 做种体积
+  seedingSize?: number; // 做种量
 
   [key: string]: any; // 其他信息
 }

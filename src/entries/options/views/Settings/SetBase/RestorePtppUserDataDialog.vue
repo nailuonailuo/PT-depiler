@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from "vue-i18n";
 import { omit } from "es-toolkit";
+import { isEmpty } from "es-toolkit/compat";
 import { computed, ref, shallowRef } from "vue";
 import {
   definitionList,
@@ -140,6 +141,13 @@ function transferUserInfo(userInfo: IPtppUserInfo) {
 }
 
 async function doImport() {
+  if (isEmpty(metadataStore.sites)) {
+    if (!confirm("你似乎还没有添加任何站点，这可能导致导入异常，是否继续？")) {
+      runtimeStore.showSnakebar("导入操作已取消。", { color: "warning" });
+      return;
+    }
+  }
+
   isImporting.value = true;
   try {
     // 暂停后端刷新数据的任务
@@ -192,15 +200,26 @@ async function entryDialog() {
   // 构造 allSupportedSiteHostMap
   const siteHostMap: Record<TSiteHost, TSiteID> = {};
   for (const siteId of definitionList) {
+    // 用户自定义的 url
     if (metadataStore.sites[siteId]?.url) {
       siteHostMap[getHostFromUrl(metadataStore.sites[siteId].url)] = siteId;
     }
+
+    // 站点定义中的 urls
     const urls = await metadataStore.getSiteMergedMetadata(siteId, "urls", []);
     if (urls.length > 0) {
       for (const url of urls) {
         siteHostMap[getHostFromUrl(url)] = siteId;
       }
     }
+
+    // 站点定义中的 host
+    const host = await metadataStore.getSiteMergedMetadata(siteId, "host", "");
+    if (host) {
+      siteHostMap[host] = siteId;
+    }
+
+    // 站点定义中的 formerHosts
     const formerHosts = (await metadataStore.getSiteMergedMetadata(siteId, "formerHosts", []))!;
     if (formerHosts.length > 0) {
       for (const host of formerHosts) {
